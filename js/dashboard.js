@@ -15,9 +15,9 @@ const CHART_COLORS = {
   ],
   priority: {
     P1: "#1f477b",
-    P2: "#ba1a1a",
+    P2: "#7c5800",
     P3: "#3a485b",
-    BLOCKED: "#ffdad6"
+    BLOCKED: "#ba1a1a"
   }
 };
 
