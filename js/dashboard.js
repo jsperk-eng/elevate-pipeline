@@ -152,11 +152,130 @@ function updatePriorityChart(widgets) {
   });
 }
 
+// Deadline: April 10, 2026
+const DEADLINE = new Date("2026-04-10T23:59:59");
+
+/**
+ * Calculate velocity and update the deadline banner.
+ */
+function updateDeadlineBanner(widgets) {
+  const now = new Date();
+  const msPerDay = 86400000;
+  const daysRemaining = Math.max(0, Math.ceil((DEADLINE - now) / msPerDay));
+
+  const total = widgets.length;
+  const validated = widgets.filter(w => w.stage === "Validated").length;
+  const blocked = widgets.filter(w => w.priority === "BLOCKED").length;
+  const remaining = total - validated - blocked;
+
+  // Velocity: only count widgets with a validatedAt timestamp (excludes pre-seeded P1s)
+  const validatedWithTimestamp = widgets.filter(w => w.validatedAt);
+  let velocity = 0;
+  let projectedDate = null;
+
+  if (validatedWithTimestamp.length > 0) {
+    const timestamps = validatedWithTimestamp
+      .map(w => w.validatedAt.toDate ? w.validatedAt.toDate() : new Date(w.validatedAt))
+      .sort((a, b) => a - b);
+
+    const earliest = timestamps[0];
+    const daysSinceFirst = Math.max(1, (now - earliest) / msPerDay);
+
+    // 7-day rolling window
+    const sevenDaysAgo = new Date(now - 7 * msPerDay);
+    const recentCount = timestamps.filter(t => t >= sevenDaysAgo).length;
+
+    if (recentCount > 0) {
+      velocity = recentCount / 7;
+    } else {
+      velocity = validatedWithTimestamp.length / daysSinceFirst;
+    }
+  }
+
+  if (velocity > 0 && remaining > 0) {
+    const daysToComplete = remaining / velocity;
+    projectedDate = new Date(now.getTime() + daysToComplete * msPerDay);
+  }
+
+  // Status
+  let status, statusClass, statusIcon;
+  if (remaining === 0) {
+    status = "Complete";
+    statusClass = "text-on-tertiary-container bg-tertiary-fixed";
+    statusIcon = "check_circle";
+  } else if (velocity === 0) {
+    status = "No Data";
+    statusClass = "text-on-surface-variant bg-surface-container-high";
+    statusIcon = "hourglass_empty";
+  } else if (projectedDate <= DEADLINE) {
+    status = "On Track";
+    statusClass = "text-on-tertiary-container bg-tertiary-fixed";
+    statusIcon = "check_circle";
+  } else {
+    const daysOver = Math.ceil((projectedDate - DEADLINE) / msPerDay);
+    if (daysOver <= 3) {
+      status = "At Risk";
+      statusClass = "text-[#7c5800] bg-[#ffedb3]";
+      statusIcon = "warning";
+    } else {
+      status = "Behind";
+      statusClass = "text-on-error-container bg-error-container";
+      statusIcon = "error";
+    }
+  }
+
+  // Required pace
+  const requiredPerDay = daysRemaining > 0 ? (remaining / daysRemaining).toFixed(1) : "—";
+
+  // Render
+  const banner = document.getElementById("deadline-banner");
+  banner.innerHTML = `
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-2xl ${remaining === 0 ? 'text-on-tertiary-container' : daysRemaining <= 5 ? 'text-error' : 'text-primary'}">calendar_today</span>
+        <div>
+          <span class="font-headline font-bold text-2xl text-primary">${daysRemaining}</span>
+          <span class="font-body text-sm text-on-surface-variant ml-1">days until April 10</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">Remaining</span>
+          <span class="font-headline font-bold text-lg text-primary">${remaining} widgets</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">Pace Needed</span>
+          <span class="font-headline font-bold text-lg text-primary">${requiredPerDay}/day</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">Velocity</span>
+          <span class="font-headline font-bold text-lg text-primary">${velocity > 0 ? velocity.toFixed(1) + '/day' : '—'}</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="text-right">
+          <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block">Projected</span>
+          <span class="font-headline font-bold text-lg text-primary">${projectedDate ? projectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}</span>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full ${statusClass}">
+        <span class="material-symbols-outlined text-sm" style="font-variation-settings: 'FILL' 1;">${statusIcon}</span>
+        <span class="font-label text-[11px] font-bold uppercase tracking-wider">${status}</span>
+      </div>
+    </div>
+  `;
+}
+
 /**
  * Handle real-time widget updates.
  */
 function onDashboardUpdate(widgets) {
   updateStats(widgets);
+  updateDeadlineBanner(widgets);
   updateStagesChart(widgets);
   updatePriorityChart(widgets);
 }

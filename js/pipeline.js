@@ -19,19 +19,18 @@ const CHANNEL_CONFIG = {
   "N/A": { class: "badge-both" }
 };
 
-// Fields to display in the detail modal, in order
-const DETAIL_FIELDS = [
-  { key: "name", label: "Widget Name" },
+// Top metadata fields — rendered in a 2x2 grid
+const GRID_FIELDS = [
   { key: "tier", label: "Tier" },
   { key: "priority", label: "Priority" },
   { key: "channel", label: "Channel" },
-  { key: "stage", label: "Current Stage" },
-  { key: "validated", label: "Validated", format: v => v ? "Yes" : "No" },
-  { key: "issues", label: "Open Issues" },
-  { key: "notes", label: "Notes" },
-  { key: "endpoint", label: "API Endpoint" },
-  { key: "filters", label: "Required Filters" },
-  { key: "fieldsNeeded", label: "Fields Needed" },
+  { key: "stage", label: "Current Stage" }
+];
+
+// Remaining fields — rendered full-width below the grid
+const DETAIL_FIELDS = [
+  { key: "filters", label: "Required Filters", codeChips: true },
+  { key: "fieldsNeeded", label: "Fields Needed", codeChips: true },
   { key: "currentDataSource", label: "Current Data Source" },
   { key: "architectureNotes", label: "Architecture Notes" },
   { key: "createdAt", label: "Created", format: v => formatTimestamp(v) },
@@ -66,13 +65,6 @@ function renderCard(widget) {
           ${isValidated ? '<span class="material-symbols-outlined text-on-tertiary-container text-sm ml-auto" style="font-variation-settings: \'FILL\' 1;">verified</span>' : ''}
         </div>
         <h4 class="font-body font-semibold text-sm text-on-surface leading-tight">${widget.name}</h4>
-        ${widget.notes ? `<p class="text-[10px] text-on-surface-variant/60 leading-relaxed line-clamp-2">${widget.notes}</p>` : ''}
-        ${widget.issues > 0 ? `
-          <div class="flex items-center gap-1.5 text-error">
-            <span class="material-symbols-outlined text-sm">bug_report</span>
-            <span class="text-[10px] font-medium">${widget.issues} Open Issue${widget.issues > 1 ? 's' : ''}</span>
-          </div>
-        ` : ''}
       </div>
     </div>
   `;
@@ -88,14 +80,38 @@ function showDetail(widgetId) {
   const priority = PRIORITY_CONFIG[widget.priority] || PRIORITY_CONFIG.P3;
   const channel = CHANNEL_CONFIG[widget.channel] || CHANNEL_CONFIG["N/A"];
 
-  const rows = DETAIL_FIELDS.map(field => {
+  const gridCells = GRID_FIELDS.map(field => {
     let value = widget[field.key];
     if (field.format) value = field.format(value);
     if (value === undefined || value === null || value === "") value = "—";
     return `
-      <div class="flex flex-col gap-0.5 py-3 border-b border-outline-variant/10 last:border-b-0">
+      <div class="flex flex-col gap-0.5">
         <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50">${field.label}</span>
         <span class="font-body text-sm text-on-surface">${value}</span>
+      </div>
+    `;
+  }).join("");
+
+  const rows = DETAIL_FIELDS.map(field => {
+    let value = widget[field.key];
+    if (field.format) value = field.format(value);
+    if (value === undefined || value === null || value === "") value = "—";
+
+    let rendered;
+    if (field.codeChips && value !== "—") {
+      const cleaned = value.replace(/,\s*(optional|required)/gi, '');
+      const chips = cleaned.split('),').map(v => v.trim().replace(/\)$/, '')).map(v => v.includes('(') ? v + ')' : v).filter(Boolean);
+      rendered = `<div class="flex flex-wrap gap-1.5 mt-1">${chips.map(c =>
+        `<code class="font-mono text-[11px] text-on-surface bg-surface-container px-2 py-1 rounded-lg border border-outline-variant/10">${c}</code>`
+      ).join("")}</div>`;
+    } else {
+      rendered = `<span class="font-body text-sm text-on-surface">${value}</span>`;
+    }
+
+    return `
+      <div class="flex flex-col gap-0.5 py-3 border-b border-outline-variant/10 last:border-b-0">
+        <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50">${field.label}</span>
+        ${rendered}
       </div>
     `;
   }).join("");
@@ -114,16 +130,48 @@ function showDetail(widgetId) {
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
-    <h3 class="font-headline font-bold text-xl text-primary mb-4">${widget.name}</h3>
+    <h3 class="font-headline font-bold text-xl text-primary mb-2">${widget.name}</h3>
+    ${widget.endpoint ? `<code class="font-mono text-[11px] text-surface-tint bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant/10 inline-block mb-4">${widget.endpoint}</code>` : ''}
+    <div class="mb-4">
+      <button id="toggle-blocked" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all ${widget.priority === 'BLOCKED' ? 'badge-blocked border-error/20' : 'bg-surface-container-lowest border-outline-variant/20 text-on-surface-variant'}">
+        <span class="material-symbols-outlined text-sm">${widget.priority === 'BLOCKED' ? 'block' : 'check_circle'}</span>
+        ${widget.priority === 'BLOCKED' ? 'Blocked' : 'Mark as Blocked'}
+      </button>
+    </div>
+    <div class="grid grid-cols-2 gap-4 py-3 mb-3 border-b border-outline-variant/10">${gridCells}</div>
     <div class="flex flex-col">${rows}</div>
   `;
 
   modal.classList.remove("hidden");
   document.getElementById("modal-close").addEventListener("click", hideDetail);
+  document.getElementById("toggle-blocked").addEventListener("click", () => toggleBlocked(widgetId));
 }
 
 function hideDetail() {
   document.getElementById("widget-modal").classList.add("hidden");
+}
+
+async function toggleBlocked(widgetId) {
+  const widget = widgetMap[widgetId];
+  if (!widget) return;
+
+  const newPriority = widget.priority === "BLOCKED" ? widget._prevPriority || "P2" : widget.priority;
+  const updates = {
+    priority: widget.priority === "BLOCKED" ? newPriority : "BLOCKED",
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  // Store previous priority so we can restore it when unblocking
+  if (widget.priority !== "BLOCKED") {
+    updates._prevPriority = widget.priority;
+  }
+
+  await db.collection("widgets").doc(widgetId).update(updates);
+
+  // Re-fetch and re-render the modal in place
+  const updatedDoc = await db.collection("widgets").doc(widgetId).get();
+  widgetMap[widgetId] = { id: widgetId, ...updatedDoc.data() };
+  showDetail(widgetId);
 }
 
 /**
