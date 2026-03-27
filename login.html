@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>ELEVATE Pipeline | Login</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <link href="css/styles.css" rel="stylesheet"/>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "surface": "#f7f9fb",
+            "primary": "#001e40",
+            "on-primary": "#ffffff",
+            "surface-container": "#eceef0",
+            "surface-container-lowest": "#ffffff",
+            "surface-container-high": "#e6e8ea",
+            "on-surface": "#191c1e",
+            "on-surface-variant": "#43474f",
+            "outline-variant": "#c3c6d1",
+            "surface-tint": "#3a5f94",
+            "error": "#ba1a1a",
+            "error-container": "#ffdad6"
+          },
+          fontFamily: {
+            "headline": ["Manrope"],
+            "body": ["Inter"],
+            "label": ["Inter"]
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-surface font-body text-on-surface min-h-screen flex items-center justify-center">
+
+  <div class="w-full max-w-sm mx-4">
+    <div class="text-center mb-8">
+      <div class="flex items-center justify-center gap-3 mb-2">
+        <span class="material-symbols-outlined text-3xl text-primary">analytics</span>
+        <h1 class="text-2xl font-bold tracking-tight text-primary font-headline">ELEVATE Pipeline</h1>
+      </div>
+      <p class="font-label text-xs tracking-widest uppercase text-on-surface-variant/60">Widget Tracker</p>
+    </div>
+
+    <div class="bg-surface-container-lowest p-6 rounded-2xl border border-outline-variant/10 shadow-[0_4px_12px_rgba(0,30,64,0.04)]">
+      <form id="login-form" class="flex flex-col gap-4">
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5" for="username">Username</label>
+          <input id="username" type="text" required autocomplete="off"
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2.5 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint focus:ring-1 focus:ring-surface-tint"
+            placeholder="Enter your name">
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5" for="password">Password</label>
+          <input id="password" type="password" required autocomplete="off"
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2.5 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint focus:ring-1 focus:ring-surface-tint"
+            placeholder="Enter password">
+        </div>
+        <div id="error-msg" class="hidden text-error text-xs font-medium"></div>
+        <button type="submit"
+          class="w-full py-2.5 rounded-full font-label text-[11px] font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-surface-tint transition-colors">
+          Sign In
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // If already logged in, redirect to dashboard
+    if (sessionStorage.getItem("elevate_user")) {
+      window.location.href = "dashboard.html";
+    }
+
+    document.getElementById("login-form").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("error-msg");
+
+      if (password !== "elevate") {
+        errorMsg.textContent = "Incorrect password.";
+        errorMsg.classList.remove("hidden");
+        return;
+      }
+
+      if (!username) {
+        errorMsg.textContent = "Please enter a username.";
+        errorMsg.classList.remove("hidden");
+        return;
+      }
+
+      sessionStorage.setItem("elevate_user", username);
+      window.location.href = "dashboard.html";
+    });
+  </script>
+</body>
+</html>

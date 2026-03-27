@@ -27,13 +27,13 @@ const CHART_COLORS = {
 function updateStats(widgets) {
   const total = widgets.length;
   const validated = widgets.filter(w => w.stage === "Validated").length;
-  const p2Remaining = widgets.filter(w => w.priority === "P2" && w.stage !== "Validated").length;
+  const remaining = widgets.filter(w => w.stage !== "Validated").length;
   const blocked = widgets.filter(w => w.priority === "BLOCKED").length;
   const pct = total > 0 ? Math.round((validated / total) * 100) : 0;
 
   document.getElementById("stat-total").textContent = total;
   document.getElementById("stat-validated").textContent = validated;
-  document.getElementById("stat-p2").textContent = p2Remaining;
+  document.getElementById("stat-remaining").textContent = remaining;
   document.getElementById("stat-blocked").textContent = blocked;
   document.getElementById("progress-pct").textContent = pct + "%";
   document.getElementById("progress-bar").style.width = pct + "%";
@@ -155,18 +155,44 @@ function updatePriorityChart(widgets) {
 // Deadline: April 10, 2026
 const DEADLINE = new Date("2026-04-10T23:59:59");
 
+/** Count working days (Mon–Fri) between two dates. */
+function countWorkingDays(from, to) {
+  let count = 0;
+  const d = new Date(from);
+  d.setHours(0, 0, 0, 0);
+  const end = new Date(to);
+  end.setHours(0, 0, 0, 0);
+  while (d <= end) {
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+/** Add N working days to a date, skipping weekends. */
+function addWorkingDays(from, numDays) {
+  const d = new Date(from);
+  let added = 0;
+  while (added < numDays) {
+    d.setDate(d.getDate() + 1);
+    const day = d.getDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return d;
+}
+
 /**
  * Calculate velocity and update the deadline banner.
  */
 function updateDeadlineBanner(widgets) {
   const now = new Date();
   const msPerDay = 86400000;
-  const daysRemaining = Math.max(0, Math.ceil((DEADLINE - now) / msPerDay));
+  const workDaysRemaining = countWorkingDays(now, DEADLINE);
 
   const total = widgets.length;
   const validated = widgets.filter(w => w.stage === "Validated").length;
-  const blocked = widgets.filter(w => w.priority === "BLOCKED").length;
-  const remaining = total - validated - blocked;
+  const remaining = total - validated;
 
   // Velocity: only count widgets with a validatedAt timestamp (excludes pre-seeded P1s)
   const validatedWithTimestamp = widgets.filter(w => w.validatedAt);
@@ -181,7 +207,7 @@ function updateDeadlineBanner(widgets) {
     const earliest = timestamps[0];
     const daysSinceFirst = Math.max(1, (now - earliest) / msPerDay);
 
-    // 7-day rolling window
+    // 7-day rolling window (calendar days — weekends naturally show 0 movement)
     const sevenDaysAgo = new Date(now - 7 * msPerDay);
     const recentCount = timestamps.filter(t => t >= sevenDaysAgo).length;
 
@@ -193,8 +219,8 @@ function updateDeadlineBanner(widgets) {
   }
 
   if (velocity > 0 && remaining > 0) {
-    const daysToComplete = remaining / velocity;
-    projectedDate = new Date(now.getTime() + daysToComplete * msPerDay);
+    const calendarDaysToComplete = remaining / velocity;
+    projectedDate = addWorkingDays(now, Math.ceil(calendarDaysToComplete));
   }
 
   // Status
@@ -224,18 +250,18 @@ function updateDeadlineBanner(widgets) {
     }
   }
 
-  // Required pace
-  const requiredPerDay = daysRemaining > 0 ? (remaining / daysRemaining).toFixed(1) : "—";
+  // Required pace (per working day)
+  const requiredPerDay = workDaysRemaining > 0 ? (remaining / workDaysRemaining).toFixed(1) : "—";
 
   // Render
   const banner = document.getElementById("deadline-banner");
   banner.innerHTML = `
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
       <div class="flex items-center gap-3">
-        <span class="material-symbols-outlined text-2xl ${remaining === 0 ? 'text-on-tertiary-container' : daysRemaining <= 5 ? 'text-error' : 'text-primary'}">calendar_today</span>
+        <span class="material-symbols-outlined text-2xl ${remaining === 0 ? 'text-on-tertiary-container' : workDaysRemaining <= 5 ? 'text-error' : 'text-primary'}">calendar_today</span>
         <div>
-          <span class="font-headline font-bold text-2xl text-primary">${daysRemaining}</span>
-          <span class="font-body text-sm text-on-surface-variant ml-1">days until April 10</span>
+          <span class="font-headline font-bold text-2xl text-primary">${workDaysRemaining}</span>
+          <span class="font-body text-sm text-on-surface-variant ml-1">work days until April 10</span>
         </div>
       </div>
       <div class="flex items-center gap-3">

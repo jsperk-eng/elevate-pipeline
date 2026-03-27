@@ -34,7 +34,8 @@ const DETAIL_FIELDS = [
   { key: "currentDataSource", label: "Current Data Source" },
   { key: "architectureNotes", label: "Architecture Notes" },
   { key: "createdAt", label: "Created", format: v => formatTimestamp(v) },
-  { key: "updatedAt", label: "Updated", format: v => formatTimestamp(v) }
+  { key: "updatedAt", label: "Updated", format: v => formatTimestamp(v) },
+  { key: "lastUpdatedBy", label: "Updated By" }
 ];
 
 function formatTimestamp(ts) {
@@ -140,11 +141,22 @@ function showDetail(widgetId) {
     </div>
     <div class="grid grid-cols-2 gap-4 py-3 mb-3 border-b border-outline-variant/10">${gridCells}</div>
     <div class="flex flex-col">${rows}</div>
+    <div class="mt-4 pt-4 border-t border-outline-variant/10">
+      <span class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/50 block mb-2">Notes</span>
+      <textarea id="widget-notes" class="w-full bg-surface-container rounded-lg border border-outline-variant/10 p-3 font-body text-sm text-on-surface resize-none focus:outline-none focus:border-surface-tint" rows="3" placeholder="Add a note...">${widget.userNotes || ''}</textarea>
+      <div class="flex gap-2 mt-2">
+        <button id="save-notes" class="px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-primary-container hover:text-on-primary-container transition-all">Save</button>
+        ${widget.userNotes ? `<button id="delete-notes" class="px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border border-outline-variant/20 text-on-surface-variant hover:text-error hover:border-error/20 transition-all">Delete</button>` : ''}
+      </div>
+    </div>
   `;
 
   modal.classList.remove("hidden");
   document.getElementById("modal-close").addEventListener("click", hideDetail);
   document.getElementById("toggle-blocked").addEventListener("click", () => toggleBlocked(widgetId));
+  document.getElementById("save-notes").addEventListener("click", () => saveNotes(widgetId));
+  const deleteBtn = document.getElementById("delete-notes");
+  if (deleteBtn) deleteBtn.addEventListener("click", () => deleteNotes(widgetId));
 }
 
 function hideDetail() {
@@ -158,7 +170,8 @@ async function toggleBlocked(widgetId) {
   const newPriority = widget.priority === "BLOCKED" ? widget._prevPriority || "P2" : widget.priority;
   const updates = {
     priority: widget.priority === "BLOCKED" ? newPriority : "BLOCKED",
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    lastUpdatedBy: getCurrentUser()
   };
 
   // Store previous priority so we can restore it when unblocking
@@ -171,6 +184,33 @@ async function toggleBlocked(widgetId) {
   // Re-fetch and re-render the modal in place
   const updatedDoc = await db.collection("widgets").doc(widgetId).get();
   widgetMap[widgetId] = { id: widgetId, ...updatedDoc.data() };
+  showDetail(widgetId);
+}
+
+async function saveNotes(widgetId) {
+  const textarea = document.getElementById("widget-notes");
+  const btn = document.getElementById("save-notes");
+  const note = textarea.value.trim();
+
+  await db.collection("widgets").doc(widgetId).update({
+    userNotes: note,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    lastUpdatedBy: getCurrentUser()
+  });
+
+  widgetMap[widgetId].userNotes = note;
+  btn.textContent = "Saved";
+  setTimeout(() => { btn.textContent = "Save"; }, 1500);
+}
+
+async function deleteNotes(widgetId) {
+  await db.collection("widgets").doc(widgetId).update({
+    userNotes: firebase.firestore.FieldValue.delete(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    lastUpdatedBy: getCurrentUser()
+  });
+
+  widgetMap[widgetId].userNotes = null;
   showDetail(widgetId);
 }
 
@@ -284,11 +324,22 @@ function initFilters() {
 /**
  * Subscribe to real-time widget updates with current filter.
  */
+function applyFilter(widgets) {
+  switch (currentFilter) {
+    case "Tier 1":
+    case "Tier 2":
+      return widgets.filter(w => w.tier === currentFilter);
+    case "blocked":
+      return widgets.filter(w => w.priority === "BLOCKED");
+    default:
+      return widgets;
+  }
+}
+
 function subscribeToWidgets() {
   if (unsubscribe) unsubscribe();
 
-  const tierFilter = currentFilter === "all" ? null : currentFilter;
-  unsubscribe = onWidgetsChange(tierFilter, renderBoard);
+  unsubscribe = onWidgetsChange(null, widgets => renderBoard(applyFilter(widgets)));
 }
 
 /**
