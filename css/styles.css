@@ -1,0 +1,77 @@
+.material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+::-webkit-scrollbar {
+    height: 4px;
+    width: 4px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c3c6d1;
+    border-radius: 10px;
+}
+
+.kanban-board {
+    display: flex;
+    gap: 0;
+    min-height: calc(100vh - 320px);
+}
+
+.kanban-column {
+    flex: 1;
+    border-right: 1px solid rgba(195, 198, 209, 0.2);
+    padding: 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.kanban-column:last-child {
+    border-right: none;
+}
+
+body {
+    min-height: 100dvh;
+}
+
+/* Filter bar */
+.filter-btn {
+    transition: all 0.15s ease;
+}
+.filter-btn.active {
+    background-color: #001e40;
+    color: #ffffff;
+}
+
+/* Drag-and-drop */
+.sortable-ghost {
+    opacity: 0.4;
+}
+.sortable-chosen {
+    box-shadow: 0 8px 24px rgba(0, 30, 64, 0.12);
+    transform: rotate(1.5deg);
+}
+.sortable-drag {
+    opacity: 0.9;
+}
+
+/* Card priority badges */
+.badge-p1 { background-color: #d5e3ff; color: #1f477b; }
+.badge-p2 { background-color: #ffdad6; color: #93000a; }
+.badge-p3 { background-color: #d5e3fc; color: #3a485b; }
+.badge-blocked { background-color: #ffdad6; color: #ba1a1a; }
+
+/* Tier badges */
+.badge-tier1 { background-color: #d5e3ff; color: #001b3c; }
+.badge-tier2 { background-color: #6ffbbe; color: #002113; }
+
+/* Channel badges */
+.badge-tpo { background-color: #d5e3ff; color: #1f477b; }
+.badge-retail { background-color: #d5e3fc; color: #3a485b; }
+.badge-both { background-color: #e0e3e5; color: #43474f; }
