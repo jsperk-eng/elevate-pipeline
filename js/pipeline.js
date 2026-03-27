@@ -1,8 +1,12 @@
 // Pipeline board logic — rendering, drag-and-drop, filtering, detail modal
 
 let currentFilter = "all";
+let currentSearch = "";
 let unsubscribe = null;
 let widgetMap = {}; // id -> widget data for modal lookup
+
+// Team members for assignment
+const TEAM_MEMBERS = ["Julian", "Freddie", "Bedon", "JP", "Plainbox QA"];
 
 // Priority badge config
 const PRIORITY_CONFIG = {
@@ -66,6 +70,7 @@ function renderCard(widget) {
           ${isValidated ? '<span class="material-symbols-outlined text-on-tertiary-container text-sm ml-auto" style="font-variation-settings: \'FILL\' 1;">verified</span>' : ''}
         </div>
         <h4 class="font-body font-semibold text-sm text-on-surface leading-tight">${widget.name}</h4>
+        ${widget.assignedTo ? `<div class="flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-on-surface-variant/50" style="font-size:14px">person</span><span class="font-label text-[10px] text-on-surface-variant/70">${widget.assignedTo}</span></div>` : ''}
       </div>
     </div>
   `;
@@ -133,11 +138,18 @@ function showDetail(widgetId) {
     </div>
     <h3 class="font-headline font-bold text-xl text-primary mb-2">${widget.name}</h3>
     ${widget.endpoint ? `<code class="font-mono text-[11px] text-surface-tint bg-surface-container px-2.5 py-1 rounded-lg border border-outline-variant/10 inline-block mb-4">${widget.endpoint}</code>` : ''}
-    <div class="mb-4">
+    <div class="flex items-center gap-3 mb-4">
       <button id="toggle-blocked" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border transition-all ${widget.priority === 'BLOCKED' ? 'badge-blocked border-error/20' : 'bg-surface-container-lowest border-outline-variant/20 text-on-surface-variant'}">
         <span class="material-symbols-outlined text-sm">${widget.priority === 'BLOCKED' ? 'block' : 'check_circle'}</span>
         ${widget.priority === 'BLOCKED' ? 'Blocked' : 'Mark as Blocked'}
       </button>
+      <div class="flex items-center gap-2 ml-auto">
+        <span class="material-symbols-outlined text-on-surface-variant/50" style="font-size:18px">person</span>
+        <select id="assign-select" class="bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-1.5 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint cursor-pointer">
+          <option value="">Unassigned</option>
+          ${TEAM_MEMBERS.map(m => `<option value="${m}" ${widget.assignedTo === m ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+      </div>
     </div>
     <div class="grid grid-cols-2 gap-4 py-3 mb-3 border-b border-outline-variant/10">${gridCells}</div>
     <div class="flex flex-col">${rows}</div>
@@ -154,6 +166,7 @@ function showDetail(widgetId) {
   modal.classList.remove("hidden");
   document.getElementById("modal-close").addEventListener("click", hideDetail);
   document.getElementById("toggle-blocked").addEventListener("click", () => toggleBlocked(widgetId));
+  document.getElementById("assign-select").addEventListener("change", (e) => assignWidget(widgetId, e.target.value));
   document.getElementById("save-notes").addEventListener("click", () => saveNotes(widgetId));
   const deleteBtn = document.getElementById("delete-notes");
   if (deleteBtn) deleteBtn.addEventListener("click", () => deleteNotes(widgetId));
@@ -179,7 +192,10 @@ async function toggleBlocked(widgetId) {
     updates._prevPriority = widget.priority;
   }
 
+  const isNowBlocked = updates.priority === "BLOCKED";
   await db.collection("widgets").doc(widgetId).update(updates);
+
+  notifyBlockedChange(widget.name, isNowBlocked, getCurrentUser());
 
   // Re-fetch and re-render the modal in place
   const updatedDoc = await db.collection("widgets").doc(widgetId).get();
@@ -212,6 +228,17 @@ async function deleteNotes(widgetId) {
 
   widgetMap[widgetId].userNotes = null;
   showDetail(widgetId);
+}
+
+async function assignWidget(widgetId, assignee) {
+  const updates = {
+    assignedTo: assignee || firebase.firestore.FieldValue.delete(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    lastUpdatedBy: getCurrentUser()
+  };
+
+  await db.collection("widgets").doc(widgetId).update(updates);
+  widgetMap[widgetId].assignedTo = assignee || null;
 }
 
 /**
@@ -293,9 +320,14 @@ async function handleDrop(evt) {
   const widgetId = cardEl.dataset.id;
   const newStage = evt.to.dataset.stage;
   const newIndex = evt.newIndex;
+  const widget = widgetMap[widgetId];
+  const oldStage = widget ? widget.stage : "Unknown";
 
   try {
     await updateWidgetStage(widgetId, newStage, newIndex);
+    if (widget && oldStage !== newStage) {
+      notifyStageChange(widget.name, oldStage, newStage, getCurrentUser());
+    }
   } catch (err) {
     console.error("Failed to update widget stage:", err);
   }
@@ -339,15 +371,62 @@ function applyFilter(widgets) {
 function subscribeToWidgets() {
   if (unsubscribe) unsubscribe();
 
-  unsubscribe = onWidgetsChange(null, widgets => renderBoard(applyFilter(widgets)));
+  unsubscribe = onWidgetsChange(null, widgets => {
+    let filtered = applyFilter(widgets);
+    if (currentSearch) {
+      const q = currentSearch.toLowerCase();
+      filtered = filtered.filter(w => w.name.toLowerCase().includes(q));
+    }
+    renderBoard(filtered);
+  });
 }
 
 /**
  * Initialize the app.
  */
+function initSearch() {
+  const toggle = document.getElementById("search-toggle");
+  const input = document.getElementById("search-input");
+  let open = false;
+
+  toggle.addEventListener("click", () => {
+    open = !open;
+    if (open) {
+      requestAnimationFrame(() => {
+        input.style.maxWidth = "200px";
+        input.style.opacity = "1";
+        input.style.paddingLeft = "0.75rem";
+        input.style.paddingRight = "0.75rem";
+        input.focus();
+      });
+    } else {
+      input.style.maxWidth = "0";
+      input.style.opacity = "0";
+      input.style.paddingLeft = "0";
+      input.style.paddingRight = "0";
+      input.value = "";
+      currentSearch = "";
+      subscribeToWidgets();
+    }
+  });
+
+  input.addEventListener("input", () => {
+    currentSearch = input.value;
+    subscribeToWidgets();
+  });
+
+  // Close on Escape
+  input.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      toggle.click();
+    }
+  });
+}
+
 async function init() {
   await seedWidgets();
   initFilters();
+  initSearch();
   initModal();
   subscribeToWidgets();
 }
