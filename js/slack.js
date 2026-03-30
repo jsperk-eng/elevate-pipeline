@@ -1,6 +1,6 @@
 // Slack integration — webhook notifications for stage changes and blocked toggles
 
-const SLACK_PROXY_URL = "/api/slack";
+const SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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";
 
 const STAGE_ICONS = {
   "Field Mapping": ":mag:",
@@ -13,16 +13,22 @@ const STAGE_ICONS = {
 };
 
 /**
- * Post a message to Slack via webhook.
+ * Post a message to Slack via incoming webhook.
+ *
+ * Uses no-cors mode with application/x-www-form-urlencoded so the browser
+ * sends a CORS "simple request" (no preflight). The trade-off: no-cors means
+ * the fetch always resolves with an opaque response — you cannot inspect
+ * response.ok or read the body. The message either lands in Slack or fails
+ * silently. If notifications stop arriving, verify the webhook URL is still
+ * active in Slack's app settings.
  */
 async function slackNotify(text) {
   try {
-    // Slack webhooks block browser CORS, so use no-cors mode.
-    // The request still reaches Slack — we just can't read the response.
-    await fetch(SLACK_PROXY_URL, {
+    await fetch(SLACK_WEBHOOK_URL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text })
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "payload=" + encodeURIComponent(JSON.stringify({ text }))
     });
   } catch (err) {
     console.error("Slack notification failed:", err);
