@@ -216,6 +216,9 @@ async function saveNotes(widgetId) {
   });
 
   widgetMap[widgetId].userNotes = note;
+  if (note) {
+    notifyNoteAdded(widgetMap[widgetId].name, note, widgetMap[widgetId].stage, getCurrentUser());
+  }
   btn.textContent = "Saved";
   setTimeout(() => { btn.textContent = "Save"; }, 1500);
 }

@@ -1,4 +1,4 @@
-// Slack integration — webhook notifications for stage changes and blocked toggles
+// Slack integration — webhook notifications for stage changes, blocked toggles, and notes
 
 const SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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";
 
@@ -51,5 +51,14 @@ function notifyBlockedChange(widgetName, isBlocked, user) {
   const text = isBlocked
     ? `:no_entry: *${widgetName}* has been *blocked* by ${user}`
     : `:large_green_circle: *${widgetName}* has been *unblocked* by ${user}`;
+  slackNotify(text);
+}
+
+/**
+ * Notify Slack when a note is added to a widget.
+ */
+function notifyNoteAdded(widgetName, note, stage, user) {
+  const icon = STAGE_ICONS[stage] || ":arrow_right:";
+  const text = `:memo: *${widgetName}* (${icon} _${stage}_) — note added by ${user}:\n> ${note}`;
   slackNotify(text);
 }
