@@ -68,6 +68,7 @@ function renderCard(widget) {
           <span class="font-label text-[10px] font-bold px-2 py-0.5 rounded-full ${channel.class}">${widget.channel}</span>
           <span class="font-label text-[10px] font-bold px-2 py-0.5 rounded-full ${widget.tier === 'Tier 1' ? 'badge-tier1' : 'badge-tier2'}">${widget.tier === 'Tier 1' ? 'T1' : 'T2'}</span>
           ${isValidated ? '<span class="material-symbols-outlined text-on-tertiary-container text-sm ml-auto" style="font-variation-settings: \'FILL\' 1;">verified</span>' : ''}
+          ${widget.userNotes ? `<span class="material-symbols-outlined text-on-surface-variant/50 text-sm ${isValidated ? '' : 'ml-auto'}" style="font-variation-settings: 'FILL' 1; font-size:16px;" title="Has notes">sticky_note_2</span>` : ''}
         </div>
         <h4 class="font-body font-semibold text-sm text-on-surface leading-tight">${widget.name}</h4>
         ${widget.assignedTo ? `<div class="flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-on-surface-variant/50" style="font-size:14px">person</span><span class="font-label text-[10px] text-on-surface-variant/70">${widget.assignedTo}</span></div>` : ''}
