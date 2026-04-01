@@ -6,7 +6,7 @@ let unsubscribe = null;
 let widgetMap = {}; // id -> widget data for modal lookup
 
 // Team members for assignment
-const TEAM_MEMBERS = ["Julian", "Freddie", "Bedon", "JP", "Plainbox QA"];
+const TEAM_MEMBERS = ["Julian", "Freddie", "Bedon", "JP", "John", "Daniel", "James M", "Plainbox QA"];
 
 // Priority badge config
 const PRIORITY_CONFIG = {
