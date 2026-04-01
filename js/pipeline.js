@@ -270,7 +270,7 @@ function renderBoard(widgets) {
           <span class="${isValidated ? 'bg-tertiary-fixed text-on-tertiary-fixed' : 'bg-surface-container-high'} px-2 py-0.5 rounded-full text-[10px] font-bold">${stageWidgets.length}</span>
         </div>
       </div>
-      <div class="card-list flex flex-col gap-3 min-h-[8rem]" data-stage="${stage}">
+      <div class="card-list flex flex-col gap-3 min-h-[8rem] flex-1 pb-40" data-stage="${stage}">
         ${stageWidgets.length > 0
           ? stageWidgets.map(renderCard).join("")
           : `<div class="border-2 border-dashed border-outline-variant/20 rounded-xl h-32 flex items-center justify-center">
@@ -283,20 +283,80 @@ function renderBoard(widgets) {
     board.appendChild(column);
   });
 
+  // Auto-scroll state for drag operations
+  let _autoScrollRAF = null;
+
+  function startAutoScroll(evt) {
+    window._dragging = true;
+    // Listen for mousemove/touchmove to auto-scroll while dragging
+    const onPointerMove = (e) => {
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const edgeSize = 80; // px from viewport edge to trigger scroll
+      const maxSpeed = 18; // px per frame
+
+      cancelAnimationFrame(_autoScrollRAF);
+
+      const scrollUp = clientY < edgeSize;
+      const scrollDown = clientY > window.innerHeight - edgeSize;
+
+      if (!scrollUp && !scrollDown) return;
+
+      const tick = () => {
+        if (scrollDown) {
+          const intensity = 1 - (window.innerHeight - clientY) / edgeSize;
+          window.scrollBy(0, Math.ceil(maxSpeed * intensity));
+        } else if (scrollUp) {
+          const intensity = 1 - clientY / edgeSize;
+          window.scrollBy(0, -Math.ceil(maxSpeed * intensity));
+        }
+        _autoScrollRAF = requestAnimationFrame(tick);
+      };
+      _autoScrollRAF = requestAnimationFrame(tick);
+    };
+
+    document.addEventListener("mousemove", onPointerMove);
+    document.addEventListener("touchmove", onPointerMove, { passive: true });
+
+    // Store cleanup so onEnd/onUnchoose can remove listeners
+    window._autoScrollCleanup = () => {
+      cancelAnimationFrame(_autoScrollRAF);
+      document.removeEventListener("mousemove", onPointerMove);
+      document.removeEventListener("touchmove", onPointerMove);
+    };
+  }
+
+  function stopAutoScroll() {
+    if (window._autoScrollCleanup) window._autoScrollCleanup();
+    setTimeout(() => { window._dragging = false; }, 50);
+  }
+
   // Initialize SortableJS on each column's card list
   document.querySelectorAll(".card-list").forEach(list => {
     Sortable.create(list, {
       group: "pipeline",
       animation: 200,
+      forceFallback: true,
       ghostClass: "sortable-ghost",
       chosenClass: "sortable-chosen",
       dragClass: "sortable-drag",
-      onEnd: handleDrop,
-      // Track drag vs click — only open modal on clean clicks
-      onChoose: () => { window._dragging = true; },
-      onUnchoose: () => { setTimeout(() => { window._dragging = false; }, 50); }
+      scroll: true,
+      scrollSensitivity: 100,
+      scrollSpeed: 20,
+      bubbleScroll: true,
+      forceAutoScrollFallback: true,
+      onStart: startAutoScroll,
+      onEnd: (evt) => { stopAutoScroll(); handleDrop(evt); }
     });
   });
+
+  // Allow mouse wheel scrolling while dragging a card.
+  // Use capture phase so we intercept before SortableJS can preventDefault.
+  document.addEventListener("wheel", (e) => {
+    if (window._dragging) {
+      e.preventDefault();
+      window.scrollBy(0, e.deltaY);
+    }
+  }, { capture: true, passive: false });
 
   // Attach click listeners (distinguish from drag)
   document.querySelectorAll(".widget-card").forEach(card => {
