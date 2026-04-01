@@ -55,6 +55,16 @@ const WIDGET_SEED_DATA = [
     architectureNotes: "Retail is per-LO, not per-AE. LO filter needed."
   },
 
+  {
+    name: "Price Lock Alert", tier: "Tier 1", priority: "P1", channel: "TPO", stage: "Field Mapping",
+    notes: "",
+    endpoint: "",
+    filters: "",
+    fieldsNeeded: "",
+    currentDataSource: "",
+    architectureNotes: ""
+  },
+
   // ── Tier 1 / P2 — Active widgets on stale/fake data ──
   {
     name: "Pipeline Alerts", tier: "Tier 1", priority: "P2", channel: "Both", stage: "Field Mapping",
@@ -416,7 +426,7 @@ const WIDGET_SEED_DATA = [
 ];
 
 // Increment this version number to force a re-seed with updated data
-const SEED_VERSION = 5;
+const SEED_VERSION = 6;
 
 /**
  * Seed Firestore with initial widget data.
