@@ -196,6 +196,7 @@ async function toggleBlocked(widgetId) {
   const isNowBlocked = updates.priority === "BLOCKED";
   await db.collection("widgets").doc(widgetId).update(updates);
 
+  logWidgetChange(widgetId, widget.name, isNowBlocked ? "blocked" : "unblocked", widget.priority, updates.priority);
   notifyBlockedChange(widget.name, isNowBlocked, getCurrentUser());
 
   // Re-fetch and re-render the modal in place
@@ -209,12 +210,14 @@ async function saveNotes(widgetId) {
   const btn = document.getElementById("save-notes");
   const note = textarea.value.trim();
 
+  const oldNotes = widgetMap[widgetId].userNotes || null;
   await db.collection("widgets").doc(widgetId).update({
     userNotes: note,
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     lastUpdatedBy: getCurrentUser()
   });
 
+  logWidgetChange(widgetId, widgetMap[widgetId].name, "note_saved", oldNotes, note);
   widgetMap[widgetId].userNotes = note;
   if (note) {
     notifyNoteAdded(widgetMap[widgetId].name, note, widgetMap[widgetId].stage, getCurrentUser());
@@ -224,12 +227,14 @@ async function saveNotes(widgetId) {
 }
 
 async function deleteNotes(widgetId) {
+  const oldNotes = widgetMap[widgetId].userNotes || null;
   await db.collection("widgets").doc(widgetId).update({
     userNotes: firebase.firestore.FieldValue.delete(),
     updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
     lastUpdatedBy: getCurrentUser()
   });
 
+  logWidgetChange(widgetId, widgetMap[widgetId].name, "note_deleted", oldNotes, null);
   widgetMap[widgetId].userNotes = null;
   showDetail(widgetId);
 }
@@ -241,7 +246,10 @@ async function assignWidget(widgetId, assignee) {
     lastUpdatedBy: getCurrentUser()
   };
 
+  const oldAssignee = widgetMap[widgetId].assignedTo || null;
   await db.collection("widgets").doc(widgetId).update(updates);
+
+  logWidgetChange(widgetId, widgetMap[widgetId].name, assignee ? "assigned" : "unassigned", oldAssignee, assignee || null);
   widgetMap[widgetId].assignedTo = assignee || null;
 }
 
@@ -390,6 +398,7 @@ async function handleDrop(evt) {
   try {
     await updateWidgetStage(widgetId, newStage, newIndex);
     if (widget && oldStage !== newStage) {
+      logWidgetChange(widgetId, widget.name, "stage_change", oldStage, newStage);
       notifyStageChange(widget.name, oldStage, newStage, getCurrentUser());
     }
   } catch (err) {
@@ -488,7 +497,6 @@ function initSearch() {
 }
 
 async function init() {
-  await seedWidgets();
   initFilters();
   initSearch();
   initModal();

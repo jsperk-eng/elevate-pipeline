@@ -310,7 +310,6 @@ function onDashboardUpdate(widgets) {
  * Initialize dashboard.
  */
 async function init() {
-  await seedWidgets();
   onWidgetsChange(null, onDashboardUpdate);
 }
 

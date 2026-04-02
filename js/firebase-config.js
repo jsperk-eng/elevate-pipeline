@@ -425,56 +425,20 @@ const WIDGET_SEED_DATA = [
   }
 ];
 
-// Increment this version number to force a re-seed with updated data
-const SEED_VERSION = 6;
 
 /**
- * Seed Firestore with initial widget data.
- * Re-seeds if the seed version has changed (clears existing data first).
+ * Log a widget change to the widget_history audit collection.
  */
-async function seedWidgets() {
-  // Check current seed version
-  const metaDoc = await db.collection("_meta").doc("seed").get();
-  const currentVersion = metaDoc.exists ? metaDoc.data().version : 0;
-
-  if (currentVersion >= SEED_VERSION) {
-    console.log(`Widgets already at seed version ${currentVersion}.`);
-    return false;
-  }
-
-  console.log(`Upgrading seed data from v${currentVersion} to v${SEED_VERSION}...`);
-
-  // Delete existing widgets (in batches of 500 — Firestore limit)
-  const existing = await db.collection("widgets").get();
-  if (!existing.empty) {
-    const deleteBatch = db.batch();
-    existing.docs.forEach(doc => deleteBatch.delete(doc.ref));
-    await deleteBatch.commit();
-    console.log(`Deleted ${existing.size} old widgets.`);
-  }
-
-  // Seed fresh data
-  const batch = db.batch();
-  const now = firebase.firestore.FieldValue.serverTimestamp();
-
-  WIDGET_SEED_DATA.forEach((widget, index) => {
-    const ref = db.collection("widgets").doc();
-    batch.set(ref, {
-      ...widget,
-      stageOrder: index,
-      issues: 0,
-      validated: widget.stage === "Validated",
-      createdAt: now,
-      updatedAt: now
-    });
-  });
-
-  // Update seed version
-  batch.set(db.collection("_meta").doc("seed"), { version: SEED_VERSION });
-
-  await batch.commit();
-  console.log(`Seeded ${WIDGET_SEED_DATA.length} widgets (v${SEED_VERSION}).`);
-  return true;
+function logWidgetChange(widgetId, widgetName, action, before, after) {
+  db.collection("widget_history").add({
+    widgetId,
+    widgetName,
+    action,
+    before: before || null,
+    after: after || null,
+    user: getCurrentUser(),
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  }).catch(err => console.error("Audit log failed:", err));
 }
 
 /**

@@ -1,6 +1,6 @@
 // Slack integration — webhook notifications for stage changes, blocked toggles, and notes
 
-const SLACK_WEBHOOK_URL = "https://hooks.slack.com/services/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";
+const SLACK_WEBHOOK_URL = "";
 
 const STAGE_ICONS = {
   "Field Mapping": ":mag:",
