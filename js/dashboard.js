@@ -1,24 +1,16 @@
 // Dashboard logic — stats, charts, real-time updates
 
-let stagesChart = null;
-let priorityChart = null;
+let flowChart = null;
+let activityChart = null;
 
-const CHART_COLORS = {
-  stages: [
-    "#3a5f94", // Field Mapping
-    "#515f74", // Create DB Tables
-    "#737780", // Glue Extraction
-    "#a7c8ff", // Lambda Refactor
-    "#d5e3ff", // Widget Review
-    "#b9c7df", // End User QA
-    "#00b27b"  // Validated
-  ],
-  priority: {
-    P1: "#1f477b",
-    P2: "#7c5800",
-    P3: "#3a485b",
-    BLOCKED: "#ba1a1a"
-  }
+const STAGE_COLORS = {
+  "Field Mapping": "#3a5f94",
+  "Create DB Tables": "#515f74",
+  "Glue Extraction": "#737780",
+  "Lambda Refactor": "#a7c8ff",
+  "Widget Review": "#d5e3ff",
+  "End User QA": "#b9c7df",
+  "Validated": "#00b27b"
 };
 
 /**
@@ -55,101 +47,233 @@ function updateStats(widgets) {
 }
 
 /**
- * Create or update the stages bar chart.
+ * Build date labels from a start date to today.
  */
-function updateStagesChart(widgets) {
-  const stageCounts = STAGES.map(stage =>
-    widgets.filter(w => w.stage === stage).length
-  );
-
-  const ctx = document.getElementById("chart-stages").getContext("2d");
-
-  if (stagesChart) {
-    stagesChart.data.datasets[0].data = stageCounts;
-    stagesChart.update();
-    return;
+function buildDateRange(startDate) {
+  const dates = [];
+  const d = new Date(startDate);
+  d.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  while (d <= today) {
+    dates.push(new Date(d));
+    d.setDate(d.getDate() + 1);
   }
+  return dates;
+}
 
-  stagesChart = new Chart(ctx, {
-    type: "bar",
-    data: {
-      labels: STAGES.map(s => s.length > 14 ? s.slice(0, 12) + "..." : s),
-      datasets: [{
-        data: stageCounts,
-        backgroundColor: CHART_COLORS.stages,
-        borderRadius: 4,
-        borderSkipped: false
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            title: (items) => STAGES[items[0].dataIndex]
-          }
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: { stepSize: 1, font: { family: "Inter", size: 10 } },
-          grid: { color: "rgba(195, 198, 209, 0.2)" }
-        },
-        x: {
-          ticks: { font: { family: "Inter", size: 9 }, maxRotation: 45 },
-          grid: { display: false }
-        }
-      }
-    }
-  });
+function toDateKey(date) {
+  return date.toISOString().slice(0, 10);
 }
 
 /**
- * Create or update the priority doughnut chart.
+ * Stacked area chart — widgets per stage over time.
+ * Uses current widget states as baseline, then replays history backwards
+ * to reconstruct past states, then plots forward.
  */
-function updatePriorityChart(widgets) {
-  const priorities = ["P1", "P2", "P3", "BLOCKED"];
-  const counts = priorities.map(p => widgets.filter(w => w.priority === p).length);
+function updateFlowChart(widgets, history) {
+  const ctx = document.getElementById("chart-flow").getContext("2d");
 
-  const ctx = document.getElementById("chart-priority").getContext("2d");
+  if (!history.length) {
+    // No history yet — show current snapshot as a single data point
+    const today = toDateKey(new Date());
+    const datasets = STAGES.map(stage => ({
+      label: stage,
+      data: [widgets.filter(w => w.stage === stage).length],
+      backgroundColor: STAGE_COLORS[stage] + "80",
+      borderColor: STAGE_COLORS[stage],
+      borderWidth: 1.5,
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3
+    }));
 
-  if (priorityChart) {
-    priorityChart.data.datasets[0].data = counts;
-    priorityChart.update();
+    if (flowChart) { flowChart.destroy(); }
+    flowChart = new Chart(ctx, {
+      type: "line",
+      data: { labels: [today], datasets },
+      options: flowChartOptions()
+    });
     return;
   }
 
-  priorityChart = new Chart(ctx, {
-    type: "doughnut",
-    data: {
-      labels: priorities,
-      datasets: [{
-        data: counts,
-        backgroundColor: priorities.map(p => CHART_COLORS.priority[p]),
-        borderWidth: 2,
-        borderColor: "#f7f9fb"
-      }]
+  // Build date range from earliest history entry to today
+  const dates = buildDateRange(history[0].timestamp);
+  const dateKeys = dates.map(toDateKey);
+
+  // Current stage counts
+  const currentCounts = {};
+  STAGES.forEach(s => { currentCounts[s] = widgets.filter(w => w.stage === s).length; });
+
+  // Walk history backwards from today to reconstruct daily snapshots
+  const snapshots = {};
+  dateKeys.forEach(dk => { snapshots[dk] = null; });
+
+  // Start with current state for today
+  snapshots[dateKeys[dateKeys.length - 1]] = { ...currentCounts };
+
+  // Reverse history to undo changes day by day
+  const reversedHistory = [...history].reverse();
+  const counts = { ...currentCounts };
+
+  for (let i = dateKeys.length - 2; i >= 0; i--) {
+    const dk = dateKeys[i];
+    const nextDk = dateKeys[i + 1];
+    // Undo any changes that happened on nextDk
+    reversedHistory.forEach(h => {
+      if (toDateKey(h.timestamp) === nextDk) {
+        if (h.after && counts[h.after] > 0) counts[h.after]--;
+        if (h.before) counts[h.before]++;
+      }
+    });
+    snapshots[dk] = { ...counts };
+  }
+
+  const datasets = STAGES.map(stage => ({
+    label: stage,
+    data: dateKeys.map(dk => (snapshots[dk] || currentCounts)[stage] || 0),
+    backgroundColor: STAGE_COLORS[stage] + "80",
+    borderColor: STAGE_COLORS[stage],
+    borderWidth: 1.5,
+    fill: true,
+    tension: 0.3,
+    pointRadius: 0
+  }));
+
+  if (flowChart) { flowChart.destroy(); }
+  flowChart = new Chart(ctx, {
+    type: "line",
+    data: { labels: dateKeys, datasets },
+    options: flowChartOptions()
+  });
+}
+
+function flowChartOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: { font: { family: "Inter", size: 10 }, padding: 12, usePointStyle: true, pointStyleWidth: 8 }
+      },
+      tooltip: { mode: "index", intersect: false }
     },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: "60%",
-      plugins: {
-        legend: {
-          position: "bottom",
-          labels: {
-            font: { family: "Inter", size: 11 },
-            padding: 16,
-            usePointStyle: true,
-            pointStyleWidth: 8
-          }
-        }
+    scales: {
+      y: {
+        stacked: true,
+        beginAtZero: true,
+        ticks: { stepSize: 5, font: { family: "Inter", size: 10 } },
+        grid: { color: "rgba(195, 198, 209, 0.2)" }
+      },
+      x: {
+        ticks: { font: { family: "Inter", size: 9 }, maxTicksLimit: 10 },
+        grid: { display: false }
       }
     }
+  };
+}
+
+/**
+ * Cumulative activity line — total forward stage moves per day.
+ */
+function updateActivityChart(history) {
+  const ctx = document.getElementById("chart-activity").getContext("2d");
+
+  if (!history.length) {
+    if (activityChart) { activityChart.destroy(); }
+    activityChart = new Chart(ctx, {
+      type: "line",
+      data: { labels: [toDateKey(new Date())], datasets: [{ label: "Moves", data: [0], borderColor: "#3a5f94", backgroundColor: "rgba(58, 95, 148, 0.1)", fill: true, tension: 0.3, pointRadius: 3 }] },
+      options: activityChartOptions()
+    });
+    return;
+  }
+
+  // Count moves per day
+  const movesPerDay = {};
+  history.forEach(h => {
+    const dk = toDateKey(h.timestamp);
+    movesPerDay[dk] = (movesPerDay[dk] || 0) + 1;
   });
+
+  const dates = buildDateRange(history[0].timestamp);
+  const dateKeys = dates.map(toDateKey);
+
+  // Build cumulative
+  let cumulative = 0;
+  const cumulativeData = dateKeys.map(dk => {
+    cumulative += (movesPerDay[dk] || 0);
+    return cumulative;
+  });
+
+  // Daily counts for bar overlay
+  const dailyData = dateKeys.map(dk => movesPerDay[dk] || 0);
+
+  if (activityChart) { activityChart.destroy(); }
+  activityChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: dateKeys,
+      datasets: [
+        {
+          type: "line",
+          label: "Cumulative",
+          data: cumulativeData,
+          borderColor: "#3a5f94",
+          backgroundColor: "rgba(58, 95, 148, 0.08)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 0,
+          borderWidth: 2,
+          yAxisID: "y1"
+        },
+        {
+          label: "Daily Moves",
+          data: dailyData,
+          backgroundColor: "#a7c8ff",
+          borderRadius: 3,
+          yAxisID: "y"
+        }
+      ]
+    },
+    options: activityChartOptions()
+  });
+}
+
+function activityChartOptions() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: {
+        position: "bottom",
+        labels: { font: { family: "Inter", size: 10 }, padding: 12, usePointStyle: true, pointStyleWidth: 8 }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        position: "left",
+        title: { display: true, text: "Daily", font: { family: "Inter", size: 10 } },
+        ticks: { stepSize: 1, font: { family: "Inter", size: 10 } },
+        grid: { color: "rgba(195, 198, 209, 0.2)" }
+      },
+      y1: {
+        beginAtZero: true,
+        position: "right",
+        title: { display: true, text: "Cumulative", font: { family: "Inter", size: 10 } },
+        ticks: { font: { family: "Inter", size: 10 } },
+        grid: { display: false }
+      },
+      x: {
+        ticks: { font: { family: "Inter", size: 9 }, maxTicksLimit: 10 },
+        grid: { display: false }
+      }
+    }
+  };
 }
 
 // Deadline: April 10, 2026
@@ -299,11 +423,12 @@ function updateDeadlineBanner(widgets) {
 /**
  * Handle real-time widget updates.
  */
-function onDashboardUpdate(widgets) {
+async function onDashboardUpdate(widgets) {
   updateStats(widgets);
   updateDeadlineBanner(widgets);
-  updateStagesChart(widgets);
-  updatePriorityChart(widgets);
+  const history = await getStageHistory();
+  updateFlowChart(widgets, history);
+  updateActivityChart(history);
 }
 
 /**

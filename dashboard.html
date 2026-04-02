@@ -152,18 +152,20 @@
 
     <!-- Charts Row -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-      <!-- Widgets per Stage -->
+      <!-- Pipeline Flow (Stacked Area) -->
       <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 shadow-[0_4px_12px_rgba(0,30,64,0.02)]">
-        <h3 class="font-label text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">Widgets per Stage</h3>
-        <div class="relative" style="height: 220px;">
-          <canvas id="chart-stages"></canvas>
+        <h3 class="font-label text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1">Pipeline Flow</h3>
+        <p class="text-[10px] text-on-surface-variant/50 mb-4">Widgets per stage over time — data builds as cards move</p>
+        <div class="relative" style="height: 240px;">
+          <canvas id="chart-flow"></canvas>
         </div>
       </div>
-      <!-- Priority Breakdown -->
+      <!-- Cumulative Activity -->
       <div class="bg-surface-container-lowest p-5 rounded-xl border border-outline-variant/10 shadow-[0_4px_12px_rgba(0,30,64,0.02)]">
-        <h3 class="font-label text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-4">Priority Breakdown</h3>
-        <div class="relative" style="height: 220px;">
-          <canvas id="chart-priority"></canvas>
+        <h3 class="font-label text-xs font-bold uppercase tracking-wider text-on-surface-variant mb-1">Team Activity</h3>
+        <p class="text-[10px] text-on-surface-variant/50 mb-4">Cumulative stage moves per day</p>
+        <div class="relative" style="height: 240px;">
+          <canvas id="chart-activity"></canvas>
         </div>
       </div>
     </div>

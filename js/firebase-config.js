@@ -442,6 +442,26 @@ function logWidgetChange(widgetId, widgetName, action, before, after) {
 }
 
 /**
+ * Fetch stage-change history from the audit log.
+ * @returns {Promise<Array>} array of { timestamp, before, after, widgetName }
+ */
+async function getStageHistory() {
+  const snapshot = await db.collection("widget_history")
+    .where("action", "==", "stage_change")
+    .orderBy("timestamp")
+    .get();
+  return snapshot.docs.map(doc => {
+    const d = doc.data();
+    return {
+      timestamp: d.timestamp?.toDate ? d.timestamp.toDate() : new Date(d.timestamp),
+      before: d.before,
+      after: d.after,
+      widgetName: d.widgetName
+    };
+  });
+}
+
+/**
  * Fetch all widgets, optionally filtered by tier.
  * @param {string|null} tierFilter - "Tier 1", "Tier 2", or null for all
  * @returns {Promise<Array>} widgets
