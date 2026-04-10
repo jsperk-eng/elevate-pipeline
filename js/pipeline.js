@@ -162,6 +162,9 @@ function showDetail(widgetId) {
         ${widget.userNotes ? `<button id="delete-notes" class="px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border border-outline-variant/20 text-on-surface-variant hover:text-error hover:border-error/20 transition-all">Delete</button>` : ''}
       </div>
     </div>
+    <div class="mt-4 pt-4 border-t border-outline-variant/10">
+      <button id="delete-widget-btn" class="px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider border border-outline-variant/20 text-on-surface-variant transition-all">Delete Card</button>
+    </div>
   `;
 
   modal.classList.remove("hidden");
@@ -171,6 +174,7 @@ function showDetail(widgetId) {
   document.getElementById("save-notes").addEventListener("click", () => saveNotes(widgetId));
   const deleteBtn = document.getElementById("delete-notes");
   if (deleteBtn) deleteBtn.addEventListener("click", () => deleteNotes(widgetId));
+  document.getElementById("delete-widget-btn").addEventListener("click", () => deleteWidget(widgetId));
 }
 
 function hideDetail() {
@@ -251,6 +255,62 @@ async function assignWidget(widgetId, assignee) {
 
   logWidgetChange(widgetId, widgetMap[widgetId].name, assignee ? "assigned" : "unassigned", oldAssignee, assignee || null);
   widgetMap[widgetId].assignedTo = assignee || null;
+}
+
+/**
+ * Add a new widget card to Firestore.
+ */
+async function addCard(name, priority, tier, channel, endpoint, filters, fieldsNeeded, currentDataSource, architectureNotes) {
+  const now = firebase.firestore.FieldValue.serverTimestamp();
+  const ref = await db.collection("widgets").add({
+    name,
+    priority,
+    tier,
+    channel,
+    stage: "Field Mapping",
+    stageOrder: 9999,
+    validated: false,
+    notes: "",
+    endpoint: endpoint || "",
+    filters: filters || "",
+    fieldsNeeded: fieldsNeeded || "",
+    currentDataSource: currentDataSource || "",
+    architectureNotes: architectureNotes || "",
+    issues: 0,
+    createdAt: now,
+    updatedAt: now,
+    lastUpdatedBy: getCurrentUser()
+  });
+  logWidgetChange(ref.id, name, "created", null, "Field Mapping");
+}
+
+/**
+ * Delete a widget card from Firestore (with confirmation state).
+ */
+async function deleteWidget(widgetId) {
+  const widget = widgetMap[widgetId];
+  const btn = document.getElementById("delete-widget-btn");
+  if (!btn) return;
+
+  if (btn.dataset.confirm !== "true") {
+    btn.dataset.confirm = "true";
+    btn.textContent = "Confirm Delete";
+    btn.classList.add("badge-blocked");
+    btn.classList.remove("text-on-surface-variant", "border-outline-variant/20");
+    setTimeout(() => {
+      if (btn && btn.dataset.confirm === "true") {
+        btn.dataset.confirm = "";
+        btn.textContent = "Delete Card";
+        btn.classList.remove("badge-blocked");
+        btn.classList.add("text-on-surface-variant", "border-outline-variant/20");
+      }
+    }, 3000);
+    return;
+  }
+
+  await db.collection("widgets").doc(widgetId).delete();
+  logWidgetChange(widgetId, widget?.name || widgetId, "deleted", widget?.stage || null, null);
+  hideDetail();
 }
 
 /**
@@ -512,8 +572,67 @@ function initModal() {
     if (e.target === modal) hideDetail();
   });
   document.addEventListener("keydown", e => {
-    if (e.key === "Escape") hideDetail();
+    if (e.key === "Escape") {
+      hideDetail();
+      hideAddCard();
+    }
   });
+
+  // Add Card modal
+  const addModal = document.getElementById("add-card-modal");
+  document.getElementById("add-card-btn").addEventListener("click", () => {
+    document.getElementById("new-card-name").value = "";
+    document.getElementById("new-card-priority").value = "P2";
+    document.getElementById("new-card-tier").value = "Tier 1";
+    document.getElementById("new-card-channel").value = "Both";
+    document.getElementById("new-card-endpoint").value = "";
+    document.getElementById("new-card-filters").value = "";
+    document.getElementById("new-card-fields").value = "";
+    document.getElementById("new-card-source").value = "";
+    document.getElementById("new-card-arch").value = "";
+    document.getElementById("add-card-error").classList.add("hidden");
+    addModal.classList.remove("hidden");
+    setTimeout(() => document.getElementById("new-card-name").focus(), 50);
+  });
+
+  document.getElementById("add-card-close").addEventListener("click", hideAddCard);
+  addModal.addEventListener("click", e => { if (e.target === addModal) hideAddCard(); });
+
+  document.getElementById("add-card-submit").addEventListener("click", async () => {
+    const name = document.getElementById("new-card-name").value.trim();
+    const errorEl = document.getElementById("add-card-error");
+    if (!name) {
+      errorEl.textContent = "Name is required.";
+      errorEl.classList.remove("hidden");
+      return;
+    }
+    const btn = document.getElementById("add-card-submit");
+    btn.textContent = "Adding...";
+    btn.disabled = true;
+    try {
+      await addCard(
+        name,
+        document.getElementById("new-card-priority").value,
+        document.getElementById("new-card-tier").value,
+        document.getElementById("new-card-channel").value,
+        document.getElementById("new-card-endpoint").value.trim(),
+        document.getElementById("new-card-filters").value.trim(),
+        document.getElementById("new-card-fields").value.trim(),
+        document.getElementById("new-card-source").value.trim(),
+        document.getElementById("new-card-arch").value.trim()
+      );
+      hideAddCard();
+    } catch (err) {
+      errorEl.textContent = "Failed to add card. Try again.";
+      errorEl.classList.remove("hidden");
+      btn.textContent = "Add Card";
+      btn.disabled = false;
+    }
+  });
+}
+
+function hideAddCard() {
+  document.getElementById("add-card-modal").classList.add("hidden");
 }
 
 init();

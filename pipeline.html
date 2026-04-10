@@ -113,7 +113,10 @@
           <span class="font-label text-xs tracking-widest uppercase text-on-surface-variant/70">Operational Overview</span>
           <h2 class="font-headline font-bold text-3xl text-primary tracking-tight">Widget Pipeline Board</h2>
         </div>
-        <div class="flex items-center">
+        <div class="flex items-center gap-1">
+          <button id="add-card-btn" class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors" title="Add card">
+            <span class="material-symbols-outlined">add_circle</span>
+          </button>
           <button id="search-toggle" class="w-10 h-10 flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors">
             <span class="material-symbols-outlined">search</span>
           </button>
@@ -157,6 +160,80 @@
       <span class="font-body text-[10px] font-medium tracking-normal mt-1">Settings</span>
     </a>
   </nav>
+
+  <!-- Add Card Modal -->
+  <div id="add-card-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+    <div class="bg-surface-container-lowest rounded-2xl shadow-xl border border-outline-variant/10 w-full max-w-sm mx-4 p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h3 class="font-headline font-bold text-lg text-primary">Add Card</h3>
+        <button id="add-card-close" class="text-on-surface-variant/60 hover:text-on-surface transition-colors">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div class="flex flex-col gap-4">
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Name *</label>
+          <input id="new-card-name" type="text" placeholder="Widget name"
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Priority</label>
+            <select id="new-card-priority" class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+              <option value="P1">P1</option>
+              <option value="P2" selected>P2</option>
+              <option value="P3">P3</option>
+            </select>
+          </div>
+          <div>
+            <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Tier</label>
+            <select id="new-card-tier" class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+              <option value="Tier 1" selected>Tier 1</option>
+              <option value="Tier 2">Tier 2</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Channel</label>
+          <select id="new-card-channel" class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+            <option value="Both" selected>Both</option>
+            <option value="TPO">TPO</option>
+            <option value="Retail">Retail</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Endpoint</label>
+          <input id="new-card-endpoint" type="text" placeholder="GET /api/v1/..."
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Required Filters</label>
+          <input id="new-card-filters" type="text" placeholder="ae_username, from_date..."
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Fields Needed</label>
+          <input id="new-card-fields" type="text" placeholder="loan_number, status..."
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Current Data Source</label>
+          <input id="new-card-source" type="text" placeholder="Warehouse API, Excel import..."
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint">
+        </div>
+        <div>
+          <label class="font-label text-[10px] font-bold uppercase tracking-wider text-on-surface-variant/60 block mb-1.5">Architecture Notes</label>
+          <textarea id="new-card-arch" rows="2" placeholder="Notes..."
+            class="w-full bg-surface-container rounded-lg border border-outline-variant/15 px-3 py-2 font-body text-sm text-on-surface focus:outline-none focus:border-surface-tint resize-none"></textarea>
+        </div>
+        <div id="add-card-error" class="hidden text-error text-xs font-medium"></div>
+        <button id="add-card-submit" class="w-full py-2.5 rounded-full font-label text-[11px] font-bold uppercase tracking-wider bg-primary text-on-primary hover:bg-surface-tint transition-colors">
+          Add Card
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Widget Detail Modal -->
   <div id="widget-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center bg-black/30 backdrop-blur-sm">
